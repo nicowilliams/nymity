@@ -5,4 +5,4 @@ UName\*It was an object-oriented, "network" (meaning "graph") database that exis
 
 This will be a proof of concept at least, and perhaps functional enough to actually make it usable in production.
 
-All work on Nymity at this time is pending approval from `$WORK`'s Legal.
+All work on Nymity's implementation at this time is pending approval from `$WORK`'s Legal.
