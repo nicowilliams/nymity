@@ -44,6 +44,8 @@ The hierarchy level referred to the contributing object's different places in a 
 - the organization that owns `acme.example` and possibly other domains
 - the global scope (think of IANA registries -- these are "global")
 
+For some enterprises this level business is not that useful; for others it could be the greatest thing.  Of course, one could set the namespace rules to use just one level if one wished by setting the strength of the rules for the other levels to `none` (see below).
+
 Finally the collision strength had to be one of:
 
 - `strong` (there can be only one entry in the namespace with a given name, that is, the values of the contributing object's attributes referenced by the rule for the object's class)
