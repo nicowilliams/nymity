@@ -17,7 +17,7 @@ Of course, a graph database should come with a powerful query language, but UNam
 
 But again, the most important aspect of UName\*It was its namespacing functionality.
 
-The primary developer of UName\*It was @vdukhovni.
+The primary developer of UName\*It was [@vdukhovni](https://github.com/vdukhovni).
 
 ## Uname\*It's Namespaces
 
