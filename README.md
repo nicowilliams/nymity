@@ -3,7 +3,7 @@ A graph DB based on PG and UName\*It
 
 UName\*It was an object-oriented, "network" (meaning "graph") database that existed from c. 1996 through c. 2001.  I worked at the only customer that deployed it in production, and my then employer got source code when the vendor closed shop.  I became the maintainer of UName\*It, so I know it well, and I miss it.
 
-This will be a proof of concept at least, and perhaps functional enough to actually make it usable in production.
+This will be a proof of concept at least, and perhaps functional enough to actually make it usable in production, but at any rate it will be puer SQL and PlPgSQL.  No Python, no Java, no Go, no Rust, etc.  Perhaps a tiny bit of C to create a dynamic data type for PostgreSQL (this is easy to do, though I've not yet figured out how to index it correctly; the alternative is to use PostgreSQL's `JSONB` type).  In particular Nymity will not be a full-fledged system by itself -- others might add a RESTful server, or perhaps use [PostgREST](https://postgrest.org), a UI, etc.
 
 All work on Nymity's implementation at this time is pending approval from `$WORK`'s Legal.
 
@@ -16,6 +16,8 @@ Today we would term UName\*It a "graph database", but back then its creators cal
 Of course, a graph database should come with a powerful query language, but UName\*It did not have one, sadly.
 
 But again, the most important aspect of UName\*It was its namespacing functionality.
+
+The primary developer of UName\*It was @vdukhovni.
 
 ## Uname\*It's Namespaces
 
@@ -65,7 +67,7 @@ The attributes of objects could be any of these types:
 - real
 - IP address
 - boolean
-- pointer
+- pointer (every object had a unique UUID, and the UUID was the real "value" of a pointer attribute)
 
 Pointer types had to have an attribute _domain_, which was a class instances of which could be pointed to.
 
@@ -106,13 +108,66 @@ The type of the membership class was akin to the A in EAV, and the parent and ch
 
 UName\*It also had a metaschema, which was hard-coded in.  The metaschema represented itself.  Readers should refer to The Art of the MetaObject Protocol, a wonderful book that deals extensively with metaschemas in object-oriented systems, though I believe UName\*It's authors did not know about it.
 
+## UName\*It's Protocol and UI
+
+UName\*It predated the popularity of RESTful APIs, so it lacked an HTTP API, sadly.  It's protocol was very simple: a TCP connection, a Kerberos authentication exchange (`AP-REQ` and `AP-REP`/`KRB-ERROR` PDUs), then `KRB-PRIV` messages encrypting the application protocol, with the application protocol consisting of Tcl objects(!).  The protocol was a strict request/response protocol.  There were no XID-like values.
+
+The UI on the other hand was a Tcl/TK UI where the code for the UI was compiled by the server for each object class, which code the server sent to the client, and the client executed that code to render the UI.  This design was remarkably similar to todays web single-page apps (SPA)!, only without HTTP.
+
 ## SQLite3 Proof-of-Concept
 
 In late 2012 I wrote a tiny SQLite3, all-SQL toy implementation of UName\*It using just an EAV table.  This was easy because SQLite3 is dynamically typed, so I could store pointers, strings, etc. in one column.  I had SQL that would compile the class definitions (including inheritance) into `VIEW`s, with a column per attribute for scalar attributes.  Thus one could write queries against the main EAV table as well as against the `VIEW`s.  The `VIEW`s obviously were meant to be more ergonomic for most users, but the EAV table had the benefit that writing partial (and full) transitive closure queries as SQL `RECURSIVE` common table expressions (CTEs) was possible such all such queries looked almost exactly the same.
 
 I don't recall if I implemented referential integrity features like foreign keys, but that would be trivial regardless of the use of an EAV model.
 
-The insight here is this:
+The key insights here is this:
 
 - an EAV model, though it is typically disparaged as an anti-pattern, enables simple transitive closure queries
 - transitive closures are the heart of graph queries
+
+## `FOREIGN KEY`s are Bi-Directional and Chiral
+
+Also, in SQL pointers are `FOREIGN KEY`s (FKs), and they are inherently bi-directional even though they don't syntactically appear to so be.  This is because FKs require indices on both, the pointing side columns (to make `ON DELETE`/`ON UPDATE` referential integrity rules perform well) and the pointed-to side columns.  Therefore for any one `FOREIGN KEY` constraint one can always find rows that refer to a row as well as referenced rows.
+
+But `FOREIGN KEY`s are only defined on one side of the relation.  This means that FKs are _chiral_: they have a direction that can be thought of as more natural than another.  This is useful because we can use this to help define sub-graphs in graph databases.  Indeed, UName\*It's group membership classes were bi-directional _and_ chiral.  However, UName\*It's pointer attributes themselves were unidirectional -- I firmly believe this was a mistake, that pointer attributes needed to have come in _pairs_ of attributes, one for one class on one side of the relation, and the other for the other side of the relation.  If UName\*It's pointer attributes had been paired and thus bi-directional then the group memberships class would not have been needed!
+
+## Graph Databases
+
+Objects and pointers, or relationships if you wish, are the key to graph databases as the objects form vertices and the pointers form edges in a graph.
+
+The other key ingredient to graph databases is a query language that can do useful things with a graph or sub-graph.  For example, traversing scalar pointers should be just a path expression like `someattr->someotherattr->...->lastattrinpath`.  But most importantly a graph database needs to be able to answer questions like:
+
+- "what codebases depend on X?"
+- "what codebases does X depend on?"
+- "what codebases are affected by <CVE>"
+- "who are all the members of this user group or mailing list?"
+- "what are all this user's group memberships?"
+- etc.
+
+These are all just "transitive closure" queries over subsets of the full graph database -- sub-graphs.
+
+But my SQLite3-based protocol did not have a query language of its own -- it was pure SQL.  A more serious project should have a SQL-like query language (QL) with extensions for graph queries, which is to say: path expressions for use in `SELECT` and other SQL clauses, and [partial] transitive closures as table sources (which can be `VIEW`s, which SQLite3 and PostgreSQL both have, or table-valued functions, which SQLite3 did not have but PostgreSQL does have).
+
+# Implementation Plan
+
+The implementation will target PostgreSQL and will be pure SQL and PlPgSQL.  All questions of how to access the data will be left to PostgreSQL itself (its protocol) and applications of PostgreSQL such as PostgREST.
+
+I need to figure out if I can build a true `anyelement` type for PostgreSQL.  PostgreSQL has an `anyelement` type, but it cannot be used as the type of columns of `TABLE`s, sadly.  In fact, PostgreSQL has no dynamic typing except via `hstore` (an external contribution included in PG's `contrib/`), `json`, and `jsonb` (the latter two are built-in in PG).  But for an EAV-style schema I don't need arbitrarily complex JSON/hstore "documents" as attribute values -- I need only a single-valued container of values of arbitrary types.  Clearly it is possible to build such a thing using public C interfaces in PG, as that's exactly what `hstore` does.  In fact, I asked an LLM and it wrote me one.  But I need to understand how to handle indexing of values of different types in such a true `anyelement` type.  This should be the only non-SQL, non-PlPgSQL code, unless I just use `jsonb`.  Still, for a prototype using `jsonb` should be fine, so I might just do that.
+
+As in my SQLite3 prototype from 2012 `VIEW`s will be automatically `CREATE OR REPLACE VIEW`ed using `TRIGGER`s on the EAV table for classes.  And as in that prototype this requires a recursive CTE for the class inheritance graph's transitive closure.
+
+A foreign key constraint system just like UName\*It's (which itself resembled SQL's) should be trivial to build as `TRIGGER`s, much like how most SQL RDBMSes internally implement FKs as `TRIGGER`s.  (Indeed, SQLite3 used to include a command to generate such triggers, back when SQLite3 did not include full FK support.)
+
+Namespaces will be implemented as a `TRIGGER`(s) for each namespace rule on the class(es)' `TABLE`s.
+
+Inheritance is mainly a question of: a) the generation of `VIEW`s for each class, b) that have `UNION` queries when they have sub-classes.
+
+Since I won't be building a query language nor extending PostgreSQL's, the only graph query language support will be:
+
+a) a table-valued function that computes partial transitive closures for sub-graphs identified by its arguments (set of pointer types, and an object ID on the left or right side of the graph),
+
+b) `VIEW`s that implement partial transitive closures for user-defined sub-graphs where the sub-graph definition consists of a set of pointer types).
+
+That's roughly it.
+
+In fact, anyone can do this based on this README.
