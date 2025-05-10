@@ -162,7 +162,7 @@ As in my SQLite3 prototype from 2012 `VIEW`s will be automatically `CREATE OR RE
 
 A foreign key constraint system just like UName\*It's (which itself resembled SQL's) should be trivial to build as `TRIGGER`s, much like how most SQL RDBMSes internally implement FKs as `TRIGGER`s.  (Indeed, SQLite3 used to include a command to generate such triggers, back when SQLite3 did not include full FK support.)
 
-Namespaces will be implemented as a `TRIGGER`(s) for each namespace rule on the class(es)' `TABLE`s.
+Namespaces will be implemented as a `TRIGGER`(s) for each namespace rule on the class(es)' `TABLE`s, which is pretty much how UName\*It did it (except all in Tcl).
 
 Inheritance is mainly a question of: a) the generation of `VIEW`s for each class, b) that have `UNION` queries when they have sub-classes.
 
