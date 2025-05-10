@@ -56,3 +56,63 @@ The idea was that one could have rules such as:
 - usernames _are_ mailbox names
 - usernames therefore preclude mailing lists with the same names!
 
+## UName\*It's Type, O-O, and Data Model
+
+The attributes of objects could be any of these types:
+
+- string (text)
+- integer
+- real
+- IP address
+- boolean
+- pointer
+
+Pointer types had to have an attribute _domain_, which was a class instances of which could be pointed to.
+
+Attributes could have multiplicities of:
+
+- scalar (zero or one value -- zero if the attribute were optional)
+- set (zero, one, or more values)
+- sequence (ordered, i.e., array of zero, one, or more values)
+
+Sequence multiplicity was deprecated, since UName\*It mapped onto a SQL RDBMS, set semantics made more sense.
+
+UName\*It had roughly this O-O model:
+
+- multiple inheritance
+  - and what was inherited?  attributes!
+- attribute names were unique, but different constraints could be applied in different classes inheriting an attribute, but all had to have the same type
+
+Every class had to have a `name` attribute of type `string` and a `domain` attribute of type pointer and attribute class `domain` (my memory is fuzzy as to class names, but if I remember correctly class names were not capitalized), where the domain pointed to some DNS-like domain, like `london.acme.example`, or `acme.example`, or even `.`, but not a TLD or ccTLD.  The domain attribute was used to derive the hierarchy levels for namespace rules.  Thus if `london.acme.example` had `acme.example` as its parent, and `acme.example` was owned by an `organization` called, say, `Exmplar ACME Inc.`, then the "level" values substituted into any namespace rules for objects in `london.acme.example` would be `london.acme.example`, `acme.example`, `Exmplar ACME Inc.`, and `.`, while for objects in `acme.example` the levels would be `acme.example`, `acme.example`, `Exmplar ACME Inc.`, and `.` (note that for the latter one level value appears twice, which is why collision strength `normal` had to exist).
+
+## Implementation of the UName\*It data model
+
+UName\*It used an object-oriented SQL RDBMS called UniSQL/X, a long since defunct RDBMS replaced by UniSQL/M (this happened after UName\*It stopped getting support, so a port to UniSQL/M never happened, at least to my knowledge).
+
+UniSQL/X was the object-oriented database that PostgreSQL wanted to be.  Sadly PostgreSQL's object-oriented features are considered broken, and so are not used.  But in the 90s PostgreSQL wasn't the happening database that it is today anyways.
+
+UniSQL/X's object-oriented model was well suited to UName\*It v1, but by v2 it no longer was, and UName\*It started relying less and less on UniSQL/X's object oriented features.  But not all aspects of UnixSQL/X's O-O model usage were removed from UName\*It v2.5.3, so when making schema changes in UName\*It the system had to "deconflict" the UniSQL/X schema -- a slow process.
+
+At any rate, UName\*It's classes mapped onto SQL `TABLE`s, with inheritance used to make `SELECT`ing from a class with sub-classes also search the sub-classes.  Attributes mapped to columns.
+
+However, for group-like objects such as user groups, mailing lists, and "netgroups" (which could group hosts as well as users) UName\*It had an entity-attribute-value (EAV) schema in the UName\*It shcema layer such that
+
+a) all group-like classes derived from a common super-class of group-like things,
+b) all member-like classes derived from a common super-class of member-like things,
+c) all memberships were represented as instances of a membership class for the group that also inherited from a common super-class of group memberships,
+d) all memberships were name-less entities with two pointer attributes: parent (pointing to the group object) and child (pointing to the member object).
+
+The type of the membership class was akin to the A in EAV, and the parent and child pointers were akin to the E and the V in EAV.
+
+UName\*It also had a metaschema, which was hard-coded in.  The metaschema represented itself.  Readers should refer to The Art of the MetaObject Protocol, a wonderful book that deals extensively with metaschemas in object-oriented systems, though I believe UName\*It's authors did not know about it.
+
+## SQLite3 Proof-of-Concept
+
+In late 2012 I wrote a tiny SQLite3, all-SQL toy implementation of UName\*It using just an EAV table.  This was easy because SQLite3 is dynamically typed, so I could store pointers, strings, etc. in one column.  I had SQL that would compile the class definitions (including inheritance) into `VIEW`s, with a column per attribute for scalar attributes.  Thus one could write queries against the main EAV table as well as against the `VIEW`s.  The `VIEW`s obviously were meant to be more ergonomic for most users, but the EAV table had the benefit that writing partial (and full) transitive closure queries as SQL `RECURSIVE` common table expressions (CTEs) was possible such all such queries looked almost exactly the same.
+
+I don't recall if I implemented referential integrity features like foreign keys, but that would be trivial regardless of the use of an EAV model.
+
+The insight here is this:
+
+- an EAV model, though it is typically disparaged as an anti-pattern, enables simple transitive closure queries
+- transitive closures are the heart of graph queries
