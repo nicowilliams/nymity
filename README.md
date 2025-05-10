@@ -112,9 +112,9 @@ UName\*It also had a metaschema, which was hard-coded in.  The metaschema repres
 
 ## UName\*It's Protocol and UI
 
-UName\*It predated the popularity of RESTful APIs, so it lacked an HTTP API, sadly.  It's protocol was very simple: a TCP connection, a Kerberos authentication exchange (`AP-REQ` and `AP-REP`/`KRB-ERROR` PDUs), then `KRB-PRIV` messages encrypting the application protocol, with the application protocol consisting of Tcl programs(!)[^1].  The protocol was a strict request/response protocol.  There were no XID-like values.
+UName\*It predated the popularity of RESTful APIs, so it lacked an HTTP API, sadly.  It's protocol was very simple: a TCP connection, a Kerberos authentication exchange (`AP-REQ` and `AP-REP`/`KRB-ERROR` PDUs), then `KRB-PRIV` messages encrypting the application protocol, with the application protocol consisting of Tcl programs[^1].  The protocol was a strict request/response protocol.  There were no XID-like values.
 
-^[1] These Tcl programs were interpreted in a restricted interpreter that had just the equivalent of `BEGIN`, `INSERT`, `UPDATE`, `DELETE`, `COMMIT`, and DDL statements for making schema changes.
+^[1]: These Tcl programs were interpreted in a restricted interpreter that had just the equivalent of `BEGIN`, `INSERT`, `UPDATE`, `DELETE`, `COMMIT`, and DDL statements for making schema changes.
 
 The UI on the other hand was a Tcl/TK UI where the code for the UI was compiled by the server for each object class, which code the server sent to the client, and the client executed that code to render the UI.  This design was remarkably similar to todays web single-page apps (SPA)!, only without HTTP.
 
