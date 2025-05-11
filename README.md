@@ -39,12 +39,12 @@ This is a generalization of SQL `PRIMARY KEY`s.
 
 The hierarchy level referred to the contributing object's different places in a hierarchy.  Thus an object named `foo` in a domain named `tokyo.acme.example` would have these possible levels:
 
-- `tokyo.acme.example`
-- `acme.example`
-- the organization that owns `acme.example` and possibly other domains
-- the global scope (think of IANA registries -- these are "global")
+- `tokyo.acme.example` (the name of an object of class `domain`)
+- `acme.example` (the name of an object of class `cell`)
+- the organization that owns `acme.example` and possibly other domains (the name of an object of class `organization`)
+- the global scope (think of IANA registries -- these are "global") (the name of the universal root was `.`, as one might expect)
 
-For some enterprises this level business is not that useful; for others it could be the greatest thing.  Of course, one could set the namespace rules to use just one level if one wished by setting the strength of the rules for the other levels to `none` (see below).
+For some enterprises this four-hierarchy level functionality is not that necessary or useful; for others it could be the greatest thing, and for the one customer that fully deployed UName\*It it really was useful and essential.  Of course, one could set the namespace rules to use just one level if one wished by setting the strength of the rules for the other levels to `none` (see below), so enterprises can make use of one, two, three, or all four levels w/ only changes to the namespace rules.
 
 Finally the collision strength had to be one of:
 
@@ -164,7 +164,7 @@ A foreign key constraint system just like UName\*It's (which itself resembled SQ
 
 Namespaces will be implemented as a `TRIGGER`(s) for each namespace rule on the class(es)' `TABLE`s, which is pretty much how UName\*It did it (except all in Tcl).
 
-Inheritance is mainly a question of: a) the generation of `VIEW`s for each class, b) that have `UNION` queries when they have sub-classes.
+Inheritance is mainly a question of: a) computing the partial transitive closure of the class inheritance graph from a superclass to its subclasses so that b) that list of class IDs can be used in the query against the EAV table, c) the generation of convenience `VIEW`s for each class.
 
 Since I won't be building a query language nor extending PostgreSQL's, the only graph query language support will be:
 
@@ -172,6 +172,19 @@ a) a table-valued function that computes partial transitive closures for sub-gra
 
 b) `VIEW`s that implement partial transitive closures for user-defined sub-graphs where the sub-graph definition consists of a set of pointer types).
 
+And Perhaps if PG can properly inline pure SQL functions that evaluate to a single `SELECT` with multiple table sources even when the functions are invoked `SELECT` clauses, then path expressions could be implemented with such functions -- not very ergonomic w/o syntactic sugar, but if this works then syntactic sugar could be added as a contribution to PG.
+
 That's roughly it.
 
-In fact, anyone can do this based on this README.
+In fact, anyone can do this based on this README.  All the necessary details are in the description of UName\*It.
+
+# All-SQL Implementation??
+
+In 1999 I held a BoF on UName\*It at a LISA conference.  Afterwards a fellow came up to me to tell me about an all-SQL (using Oracle) database he maintained with similar functionality.  I suggested that namespace rules could not be implemented in all-SQL, surely, but he disabused me of that notion.  At the time I barely understood SQL.  UName\*It was a very large application, made all the larger by implementing almost nothing in SQL.  The only feature of the UName\*It data model -or any feature of UName\*It- that was implemented in SQL or otherwise by the underlying RDBMS (UniSQL/X) was that queries against classes would find instances of subclasses.
+
+Now I understand that yes, every feature of UName\*It can be implemented quite naturally in pure SQL, and that there are good reasons to do so:
+
+- relational logic is always best implemented using the underlying RDBMS as that means
+- not having to re-implement features of the RDBMS -- it's always best not to re-implement core features of the RDBMS
+- UName\*It had a very large amount of Tcl code to implement its relational features, which in my estimation can be reduced by an order of magnitude by using SQL
+- the smaller the implementation, the easier it will be to understand it, even if that means having to understand SQL and the RDBMS
